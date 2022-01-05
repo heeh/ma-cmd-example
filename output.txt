@@ -1,0 +1,22 @@
+STARTING!
+RunCPU()
+
+1. Load Model()
+
+Loaded model detect.tflite
+2. Init Intertpreter
+
+3. Set up Input Tensor
+
+4. Prepare Input data
+
+5. Warm up
+
+Running benchmark for at least 1 iterations and at least 0.5 seconds but terminate if exceeding 150 seconds.
+count=32 first=35235 curr=14868 min=14619 max=35235 avg=15697.4 std=3545
+
+6. Actual
+
+Running benchmark for at least 50 iterations and at least 1 seconds but terminate if exceeding 150 seconds.
+count=68 first=15378 curr=15263 min=14500 max=15433 avg=14756.4 std=218
+
