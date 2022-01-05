@@ -52,7 +52,7 @@ class LoggingWrapper {
       //ofs.open("/sdcard/output.txt", std::ios::app);
 
       // For Desktop
-      ofs.open("/Users/heeh/Github/tensorflow-r2.5/output.txt", std::ios::app);
+      ofs.open("/Users/heeh/Github/tensorflow-cmd/output.txt", std::ios::app);
       //std::cout << "hello world!\n";
       switch (severity_) {
         case LogSeverity::INFO:

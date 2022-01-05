@@ -821,84 +821,96 @@ BenchmarkTfLiteModel::MayCreateProfilingListener() const {
 TfLiteStatus BenchmarkTfLiteModel::RunImpl() { return interpreter_->Invoke(); }
 
 
+// TfLiteStatus BenchmarkTfLiteModel::RunCPU(std::string graph) {
+//   TFLITE_LOG(INFO) << "RunCPU()\n";
+//   TFLITE_LOG(INFO) << "1. Load Model()\n";
+//   model_ = tflite::FlatBufferModel::BuildFromFile(graph.c_str());
+//   if (!model_) {
+//     TFLITE_LOG(ERROR) << "Failed to mmap model " << graph;
+//     return kTfLiteError;
+//   }
+//   TFLITE_LOG(INFO) << "Loaded model " << graph;
+
+//   TFLITE_LOG(INFO) << "2. Init Intertpreter\n";
+//   InitInterpreter();
+
+
+//   TFLITE_LOG(INFO) << "3. Set up Input Tensor\n";
+//   auto interpreter_inputs = interpreter_->inputs();
+
+//   if (!inputs_.empty()) {
+//     TFLITE_TOOLS_CHECK_EQ(inputs_.size(), interpreter_inputs.size())
+//         << "Inputs mismatch: Model inputs #:" << inputs_.size()
+//         << " expected: " << interpreter_inputs.size();
+//   }
+
+//   // Check if the tensor names match, and log a warning if it doesn't.
+//   // TODO(ycling): Consider to make this an error again when the new converter
+//   // create tensors with consistent naming.
+//   for (int j = 0; j < inputs_.size(); ++j) {
+//     const InputLayerInfo& input = inputs_[j];
+//     int i = interpreter_inputs[j];
+//     TfLiteTensor* t = interpreter_->tensor(i);
+//     if (input.name != t->name) {
+//       TFLITE_LOG(WARN) << "Tensor # " << i << " is named " << t->name
+//                        << " but flags call it " << input.name;
+//     }
+
+//     if (input.shape.size() != t->dims->size) {
+//       TFLITE_LOG(ERROR) << "Input tensor #" << i << " should have "
+//                         << t->dims->size << " dimensions!";
+//       return kTfLiteError;
+//     }
+//   }
+
+//   // Resize all non-string tensors.
+//   for (int j = 0; j < inputs_.size(); ++j) {
+//     const InputLayerInfo& input = inputs_[j];
+//     int i = interpreter_inputs[j];
+//     TfLiteTensor* t = interpreter_->tensor(i);
+//     if (t->type != kTfLiteString) {
+//       interpreter_->ResizeInputTensor(i, input.shape);
+//     }
+//   }
+
+//   if (interpreter_->AllocateTensors() != kTfLiteOk) {
+//     TFLITE_LOG(ERROR) << "Failed to allocate tensors!";
+//     return kTfLiteError;
+//   }
+
+//   ruy_profiling_listener_.reset(new RuyProfileListener());
+//   AddListener(ruy_profiling_listener_.get());
+
+//   TFLITE_LOG(INFO) << "4. Prepare Input data\n";
+//   PrepareInputData();
+//   TfLiteStatus status = kTfLiteOk;
+
+//   TFLITE_LOG(INFO) << "5. Warm up\n";
+//   Stat<int64_t> warmup_time_us =
+//       Run(params_.Get<int32_t>("warmup_runs"),
+//           params_.Get<float>("warmup_min_secs"), params_.Get<float>("max_secs"),
+//           WARMUP, &status);
+//   if (status != kTfLiteOk) {
+//     return status;
+//   }
+
+//   TFLITE_LOG(INFO) << "6. Actual\n";
+//   Stat<int64_t> inference_time_us =
+//       Run(params_.Get<int32_t>("num_runs"), params_.Get<float>("min_secs"),
+//           params_.Get<float>("max_secs"), REGULAR, &status);
+//   return status;
+// }
+
 TfLiteStatus BenchmarkTfLiteModel::RunCPU(std::string graph) {
-  TFLITE_LOG(INFO) << "RunCPU()\n";
-  TFLITE_LOG(INFO) << "1. Load Model()\n";
-  model_ = tflite::FlatBufferModel::BuildFromFile(graph.c_str());
-  if (!model_) {
-    TFLITE_LOG(ERROR) << "Failed to mmap model " << graph;
-    return kTfLiteError;
-  }
-  TFLITE_LOG(INFO) << "Loaded model " << graph;
+  std::vector<std::string> arguments = {"benchmark_model", "--graph=" + graph, "--use_xnnpack=false", "num_threads=4"};
+  std::vector<char*> argv;
+  for (const auto& arg : arguments)
+    argv.push_back((char*)arg.data());
+  argv.push_back(nullptr);
 
-  TFLITE_LOG(INFO) << "2. Init Intertpreter\n";
-  InitInterpreter();
-
-
-  TFLITE_LOG(INFO) << "3. Set up Input Tensor\n";
-  auto interpreter_inputs = interpreter_->inputs();
-
-  if (!inputs_.empty()) {
-    TFLITE_TOOLS_CHECK_EQ(inputs_.size(), interpreter_inputs.size())
-        << "Inputs mismatch: Model inputs #:" << inputs_.size()
-        << " expected: " << interpreter_inputs.size();
-  }
-
-  // Check if the tensor names match, and log a warning if it doesn't.
-  // TODO(ycling): Consider to make this an error again when the new converter
-  // create tensors with consistent naming.
-  for (int j = 0; j < inputs_.size(); ++j) {
-    const InputLayerInfo& input = inputs_[j];
-    int i = interpreter_inputs[j];
-    TfLiteTensor* t = interpreter_->tensor(i);
-    if (input.name != t->name) {
-      TFLITE_LOG(WARN) << "Tensor # " << i << " is named " << t->name
-                       << " but flags call it " << input.name;
-    }
-
-    if (input.shape.size() != t->dims->size) {
-      TFLITE_LOG(ERROR) << "Input tensor #" << i << " should have "
-                        << t->dims->size << " dimensions!";
-      return kTfLiteError;
-    }
-  }
-
-  // Resize all non-string tensors.
-  for (int j = 0; j < inputs_.size(); ++j) {
-    const InputLayerInfo& input = inputs_[j];
-    int i = interpreter_inputs[j];
-    TfLiteTensor* t = interpreter_->tensor(i);
-    if (t->type != kTfLiteString) {
-      interpreter_->ResizeInputTensor(i, input.shape);
-    }
-  }
-
-  if (interpreter_->AllocateTensors() != kTfLiteOk) {
-    TFLITE_LOG(ERROR) << "Failed to allocate tensors!";
-    return kTfLiteError;
-  }
-
-  ruy_profiling_listener_.reset(new RuyProfileListener());
-  AddListener(ruy_profiling_listener_.get());
-
-  TFLITE_LOG(INFO) << "4. Prepare Input data\n";
-  PrepareInputData();
-  TfLiteStatus status = kTfLiteOk;
-
-  TFLITE_LOG(INFO) << "5. Warm up\n";
-  Stat<int64_t> warmup_time_us =
-      Run(params_.Get<int32_t>("warmup_runs"),
-          params_.Get<float>("warmup_min_secs"), params_.Get<float>("max_secs"),
-          WARMUP, &status);
-  if (status != kTfLiteOk) {
-    return status;
-  }
-
-  TFLITE_LOG(INFO) << "6. Actual\n";
-  Stat<int64_t> inference_time_us =
-      Run(params_.Get<int32_t>("num_runs"), params_.Get<float>("min_secs"),
-          params_.Get<float>("max_secs"), REGULAR, &status);
-  return status;
+  TFLITE_LOG(INFO) << "STARTING!";
+  BenchmarkTfLiteModel benchmark;
+  return benchmark.Run(argv.size()-1, argv.data());
 }
 
 }  // namespace benchmark
